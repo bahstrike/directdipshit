@@ -901,13 +901,14 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 	else if (msgID == MSGID_JoinRequestResponse)
 	{
 		JOINRESULT jr = (JOINRESULT)p.readUInt32();
-		int unknown = p.readUInt32();
+		short dunno1 = p.readInt16();
+		short dunno2 = p.readInt16();
 
 		// if host was busy from our attempt, clear flag to try again
 		if (jr == JR_BUSY)
 			g_bAttemptedJoin = false;
 
-		Log("JOIN RESULT (%d): %s    extra %d", jr, JoinResultToString(jr), unknown);
+		Log("JOIN RESULT (%d): %s   d1:%d    d2:%d", jr, JoinResultToString(jr), dunno1, dunno2);
 	}
 	else if (msgID == MSGID_JoinRequest)
 	{
