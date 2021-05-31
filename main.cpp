@@ -14,13 +14,7 @@
 #define PLAYERNAME "DIRECTDIPSHIT"
 
 #define LOGPATH "c:\\directdipshit\\"
-
-/*DEFINE_GUID(JK_GUID, 
-	0x5bfdb060, 0x6a4, 0x11d0, 0x9c, 0x4f, 0x0, 0xa0, 0xc9, 0x5, 0x42, 0x5e//DPCHAT_GUID   TESTING FOR NOW... NEED JK KEY
-	//0xbfF0613c0, 0x11d0de79, 0x0a000c999, 0x4BAD7624 //0BF0613C0 11D0DE79 0A000C999 4BAD7624//JK_GUID
-);*/
-
-
+#define IGNORESYNCMSG 1
 
 /*
 	CHECKSUM INFORMATION FROM SHINY:
@@ -42,7 +36,7 @@ then in the future you can just precalc_hash_0 ^ new_salt_N = current_hash
 
 GUID* GimmeJKGUID()
 {
-	static int _jkguid[] = {
+	static unsigned int _jkguid[] = {
 		0x0BF0613C0,
 		0x011D0DE79,
 		0x0A000C999,
@@ -236,8 +230,8 @@ BOOL FAR PASCAL DPlayEnumSessions(
 	DWORD dwFlags, LPVOID lpContext)
 {
 	HWND   hWnd = (HWND)lpContext;
-	LPGUID lpGuid;
-	LONG   iIndex;
+	//LPGUID lpGuid;
+	//LONG   iIndex;
 
 	// Determine if the enumeration has timed out.
 	if (dwFlags & DPESC_TIMEDOUT)
@@ -741,6 +735,15 @@ struct PLAYERSLOT
 			p.read((char*)this + 4, sizeof(PLAYERSLOT) - 4);
 	}
 };
+
+struct DUNNOPLAYERINFO
+{
+	char model[32];
+	char soundclass[32];
+	char saber0[32];
+	char saber1[32];
+};
+
 #pragma pack(pop)
 
 volatile int g_nMaxPlayerSlots = 0;
@@ -794,10 +797,15 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 	MESSAGEID msgID = (MESSAGEID)p.readUInt16();
 	unsigned short packetNum = p.readUInt16();
 
-	bool ignoreSyncMsg = true;
-
 	// blacklist some IDs for dev purposes to prevent flooding
-	if(!ignoreSyncMsg || (msgID != MSGID_ThingSync && msgID != MSGID_Dunno_SomeSync4 && msgID != MSGID_Dunno_SomeSync5 && msgID != MSGID_Dunno_SomeSync6))
+	bool blacklist = msgID == MSGID_ThingSync ||
+					 msgID == MSGID_Dunno_SomeSync4 ||
+					 msgID == MSGID_Dunno_SomeSync5 ||
+					 msgID == MSGID_Dunno_SomeSync6;
+
+	bool logPacket = !IGNORESYNCMSG || !blacklist;
+
+	if(logPacket)
 		Log("ProcessPacket (dump:%d,  len:%d) senderDpid:%d  msgID:0x%02X  packetNum:%d  msg:%s", dumpIndex, p.getTotalLength(), senderDpid, msgID, packetNum, MessageIDToString(msgID));
 
 	if (msgID == MSGID_HostStatus)
@@ -989,22 +997,13 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 	}
 	else if (msgID == MSGID_PlayerInfo1 || msgID == MSGID_PlayerInfo2)
 	{
-		int playerSlotIndex = p.readInt32();//player slot  (at least for MSGID_PlayerInfo1)
+		int slotIndex = p.readInt32();
 
-		char playerModel[32];
-		p.read(playerModel, 32);
-
-		char playerSoundClass[32];
-		p.read(playerSoundClass, 32);
-
-		char playerSaberMat0[32];
-		p.read(playerSaberMat0, 32);
-
-		char playerSaberMat1[32];
-		p.read(playerSaberMat1, 32);
+		DUNNOPLAYERINFO plr;
+		p.read(&plr, sizeof(plr));
 
 
-		Log("SOME PLAYERINFO!!  playerSlot:%d    model:%s   sndcls:%s    saber0:%s   saber1:%s", playerSlotIndex, playerModel, playerSoundClass, playerSaberMat0, playerSaberMat1);
+		Log("SOME PLAYERINFO!!  playerSlot:%d    model:%s   sndcls:%s    saber0:%s   saber1:%s", slotIndex, plr.model, plr.soundclass, plr.saber0, plr.saber1);
 
 		// might need to ack it
 		PacketNumAck(senderDpid, packetNum);
@@ -1068,7 +1067,7 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 			}
 		}
 
-		if (!ignoreSyncMsg)
+		if (!IGNORESYNCMSG)
 			Log(msg);
 
 		msgID = msgID;
@@ -1103,7 +1102,7 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 		unsigned short dunno1 = p.readUInt16();
 		int dunno2 = p.readInt32();
 
-		if (!ignoreSyncMsg)
+		if (!IGNORESYNCMSG)
 			Log("DUNSYNC5   d1:0x%04X   d2:%d", dunno1, dunno2);
 	}
 	else if (msgID == MSGID_Dunno_SomeSync6)
@@ -1113,7 +1112,7 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 
 		float f1maybe = p.readFloat();
 
-		if (!ignoreSyncMsg)
+		if (!IGNORESYNCMSG)
 			Log("DERPSONC6   d1:0x%04X   d2:%d   f1maybe:%0.02f", dunno1, dunno2, f1maybe);
 	}
 	else if (msgID == MSGID_Dunno_SomeSync1)
@@ -1135,9 +1134,17 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 		float f10 = p.readFloat();
 		
 		
-		if (!ignoreSyncMsg)
+		if (!IGNORESYNCMSG)
 			Log("DOINK1   d1:0x%04X  d2:0x%04X  d3:0x%04X  d4:0x%04X  f1:%0.02f  f2:%0.02f  f3:%0.02f  f4:%0.02f  f5:%0.02f  f6:%0.02f  f7:%0.02f  f8:%0.02f  f9:%0.02f  f10:%0.02f  ",
 				dunno1, dunno2, dunno3, dunno4, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10);
+	}
+
+
+	int remainBytes = p.getTotalLength() - p.getCurrentPosition();
+	if (remainBytes > 0)
+	{
+		if(logPacket)
+			Log("DIDNT READ EVERYTHING.. %d remain", remainBytes);
 	}
 }
 
@@ -1604,7 +1611,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	CoUninitialize();
 
-exitmain:
+//exitmain:
 	Log("----------------------------------------------");
 	Log("EXITING");
 	Log("----------------------------------------------");
