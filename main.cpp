@@ -553,41 +553,6 @@ void EmulatePacketFromFile(const char* szDumpFile)
 	delete[] msg;
 }
 
-void CleanupOldDumpFiles()
-{
-	int dumpfiles = 0;
-
-	for (int dumprun = 0; dumprun < 2; dumprun++)
-	{
-		WIN32_FIND_DATA fd;
-		HANDLE hFind = FindFirstFile(GenerateLogFilePath("dplayRECV*.dmp"), &fd);
-		if (hFind != INVALID_HANDLE_VALUE && hFind != NULL)
-		{
-			do {
-				if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
-					continue;
-
-				if (dumprun == 0)
-				{
-					dumpfiles++;
-				}
-				else
-				{
-					DeleteFile(GenerateLogFilePath(fd.cFileName));
-				}
-			} while (FindNextFile(hFind, &fd));
-
-			FindClose(hFind);
-
-			if (dumprun == 0)
-			{
-				Log("CLEANUP DUMP FILES:  %d", dumpfiles);
-			}
-		}
-	}
-	
-}
-
 void ReadPackets()
 {
 	// gotcha bitch- lets get ur data
