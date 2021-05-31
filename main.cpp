@@ -797,12 +797,39 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 	bool ignoreSyncMsg = true;
 
 	// blacklist some IDs for dev purposes to prevent flooding
-	if(!ignoreSyncMsg || (msgID != MSGID_ThingSync && msgID != MSGID_Dunno_SomeSync4))
+	if(!ignoreSyncMsg || (msgID != MSGID_ThingSync && msgID != MSGID_Dunno_SomeSync4 && msgID != MSGID_Dunno_SomeSync5 && msgID != MSGID_Dunno_SomeSync6))
 		Log("ProcessPacket (dump:%d,  len:%d) senderDpid:%d  msgID:0x%02X  packetNum:%d  msg:%s", dumpIndex, p.getTotalLength(), senderDpid, msgID, packetNum, MessageIDToString(msgID));
 
 	if (msgID == MSGID_HostStatus)
 	{
-		// nothing more to read?
+		// for 118 bytes
+
+		int d1 = p.readInt32();
+		int d2 = p.readInt32();
+		unsigned int d3 = p.readUInt32();
+		unsigned int d4 = p.readUInt32();
+
+		float f1 = p.readFloat();
+		float f2 = p.readFloat();
+		float f3 = p.readFloat();
+
+		char sab0[32];
+		p.read(sab0, 32);
+
+		char sab1[32];
+		p.read(sab1, 32);
+
+		int d5 = p.readInt32();
+		int d6 = p.readInt32();
+		int d7 = p.readInt32();
+		int d8 = p.readInt32();
+		int d9 = p.readInt32();
+		unsigned short d10 = p.readInt16();
+
+		Log("HOSTSTATUSLOLL   d1:%d    d2:%d    d3:0x%08X    d4:0x%08X    f1:%0.2f   f2:%0.2f   f3:%0.2f    sab0:%s    sab1:%s    d5:%d   d6:%d   d7:%d   d8:%d   d9:%d   d10:%d",
+			d1, d2, d3, d4, f1, f2, f3, sab0, sab1, d5, d6, d7, d8, d9, d10);
+
+
 	} else if (msgID == DPSYS_CREATEPLAYERORGROUP)
 	{
 		DWORD playerType = p.readUInt32();//might not have a full struct for 0 type
@@ -849,7 +876,7 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 		g_hostDpid = (DPID)p.readUInt32();
 		int maxPlayerEntries = p.readInt16();
 
-		Log("Server info:  host DPID:%d   maxPlayers:%d", g_hostDpid, maxPlayerEntries);
+		//Log("Server info:  host DPID:%d   maxPlayers:%d", g_hostDpid, maxPlayerEntries);
 
 
 		if (g_pPlayerSlots != nullptr)
@@ -1503,7 +1530,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 				// construct a console message broadcast lol
-				Log("ADDING WARM WELCOME TO CHAT");
+				//Log("ADDING WARM WELCOME TO CHAT");
 
 
 
