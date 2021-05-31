@@ -1,222 +1,5 @@
-#include <Windows.h>
-#include <comdef.h>
-#include <initguid.h>//#define INITGUID  might only need this- havent tried it// must be included before creating GUIDs and maybe even before teh dplay crap
-#include <stdio.h>
-#include <stdarg.h>
-#include <dplay.h>
-#include <dplobby.h>
-#include <vector>
-
-//#pragma comment(lib, "cmcfg32.lib")// need for priv stuff?  maybe not
-
-#define MAXPLAYERS 32
-#define SESSIONNAME "DIRECTDIPSHIT HERE"
-#define PLAYERNAME "DIRECTDIPSHIT"
-
-#define LOGPATH "c:\\directdipshit\\"
-#define IGNORESYNCMSG 1
-
-/*
-	CHECKSUM INFORMATION FROM SHINY:
-
-	input salt appears to come from DPSESSIONDESC2::dwUser1
-
-
-	his ideas for extracting levelchecksum and regenerating it  (salt-independent) are as follows:
-
-so you could do like, known_salt ^ precalc_hash_0
-and get the precalc_hash_0 by taking the checksum and xoring it with the bitwise inverse of the salt
-I think
-yeah so hash_N ^ salt_N ^ 0xFFFFFFFF = precalc_hash_0
-then in the future you can just precalc_hash_0 ^ new_salt_N = current_hash
-
-*/
-
-
-
-GUID* GimmeJKGUID()
-{
-	static unsigned int _jkguid[] = {
-		0x0BF0613C0,
-		0x011D0DE79,
-		0x0A000C999,
-		0x04BAD7624
-	};
-
-	return (GUID*)_jkguid;
-}
-
-
-bool EnableDebugPrivilege()
-{
-	HANDLE hToken;
-	LUID sedebugnameValue;
-	TOKEN_PRIVILEGES tkp;
-	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken))
-	{
-		return   FALSE;
-	}
-	if (!LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &sedebugnameValue))
-	{
-		CloseHandle(hToken);
-		return false;
-	}
-	tkp.PrivilegeCount = 1;
-	tkp.Privileges[0].Luid = sedebugnameValue;
-	tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-	if (!AdjustTokenPrivileges(hToken, FALSE, &tkp, sizeof(tkp), NULL, NULL))
-	{
-		CloseHandle(hToken);
-		return false;
-	}
-	return true;
-}
-
-
-
-// TO BE USED WHEN HOSTING JK LOCALLY-  just get the checksum value from the process directly.
-// IF THIS SHIT FAILS, YOU NEED TO RUN VEGETABLESTUDIO AS ADMIN
-unsigned int ExtractLocalhostChecksum()
-{
-	static bool escalated = false;
-	if (!escalated)
-	{
-		escalated = true;
-		if (!EnableDebugPrivilege())
-			return 0;
-	}
-
-	HWND hJKWnd = FindWindow("wKernel", "Jedi Knight");
-	if (hJKWnd == NULL)
-		return 0;
-
-	DWORD jkProcessID;
-	GetWindowThreadProcessId(hJKWnd, &jkProcessID);
-
-	HANDLE hJK = OpenProcess(PROCESS_ALL_ACCESS, FALSE, jkProcessID);
-	if (hJK == NULL)
-		return 0;
-
-	unsigned int checksum = 0;
-	ReadProcessMemory(hJK, (void*)0x00832678, &checksum, 4, NULL);
-
-	CloseHandle(hJK);
-
-	return checksum;
-}
-
-
-CRITICAL_SECTION g_logCritSect;
-
-void Log(const char* fmt, ...)
-{
-	EnterCriticalSection(&g_logCritSect);
-
-	va_list va;
-	uintptr_t msg_len;
-
-	va_start(va, fmt);
-	msg_len = vsnprintf(NULL, 0, fmt, va);
-	va_end(va);
-
-	char* buf = new char[msg_len + 1];
-
-	va_start(va, fmt);
-	vsprintf(buf, fmt, va);
-	va_end(va);
-
-
-	FILE* f = fopen(LOGPATH"directdipshit.log", "a");
-	fwrite(buf, 1, msg_len, f);
-	fwrite("\n", 1, 1, f);
-	fclose(f);
-
-
-	delete[] buf;
-
-	LeaveCriticalSection(&g_logCritSect);
-}
-
-// super unsafe esp for threads but im lazy
-const char* FormatHRESULT(HRESULT hr)
-{
-	_com_error err(hr);
-	LPCTSTR errMsg = err.ErrorMessage();
-
-	static char szBuf[1024];
-	strncpy(szBuf, errMsg, sizeof(szBuf) - 1);
-
-	return szBuf;//lol
-}
-
-const char* FormatDPLAYRESULT(HRESULT hr)
-{
-	switch (hr)
-	{
-	case S_OK: return "DP_OK";
-	case MAKE_DPHRESULT(5): return "DPERR_ALREADYINITIALIZED";
-	case MAKE_DPHRESULT(10):return "DPERR_ACCESSDENIED";
-	case MAKE_DPHRESULT(20):return "DPERR_ACTIVEPLAYERS";
-	case MAKE_DPHRESULT(30):return "DPERR_BUFFERTOOSMALL";
-	case MAKE_DPHRESULT(40):return "DPERR_CANTADDPLAYER";
-	case MAKE_DPHRESULT(50):return "DPERR_CANTCREATEGROUP";
-	case MAKE_DPHRESULT(60):return "DPERR_CANTCREATEPLAYER";
-	case MAKE_DPHRESULT(70):return "DPERR_CANTCREATESESSION";
-	case MAKE_DPHRESULT(80):return "DPERR_CAPSNOTAVAILABLEYET";
-	case MAKE_DPHRESULT(90):return "DPERR_EXCEPTION";
-	case E_FAIL:return "DPERR_GENERIC";
-	case MAKE_DPHRESULT(120):return "DPERR_INVALIDFLAGS";
-	case MAKE_DPHRESULT(130):return "DPERR_INVALIDOBJECT";
-	//case E_INVALIDARG:return "DPERR_INVALIDPARAM";
-	case DPERR_INVALIDPARAM:return "DPERR_INVALIDPARAMS";
-	case MAKE_DPHRESULT(150):return "DPERR_INVALIDPLAYER";
-	case MAKE_DPHRESULT(155):return "DPERR_INVALIDGROUP";
-	case MAKE_DPHRESULT(160):return "DPERR_NOCAPS";
-	case MAKE_DPHRESULT(170):return "DPERR_NOCONNECTION";
-	//case E_OUTOFMEMORY:return "DPERR_NOMEMORY";
-	case DPERR_NOMEMORY:return "DPERR_OUTOFMEMORY";
-	case MAKE_DPHRESULT(190):return "DPERR_NOMESSAGES";
-	case MAKE_DPHRESULT(200):return "DPERR_NONAMESERVERFOUND";
-	case MAKE_DPHRESULT(210):return "DPERR_NOPLAYERS";
-	case MAKE_DPHRESULT(220):return "DPERR_NOSESSIONS";
-	case E_PENDING:return "DPERR_PENDING";
-	case MAKE_DPHRESULT(230):return "DPERR_SENDTOOBIG";
-	case MAKE_DPHRESULT(240):return "DPERR_TIMEOUT";
-	case MAKE_DPHRESULT(250):return "DPERR_UNAVAILABLE";
-	case E_NOTIMPL:return "DPERR_UNSUPPORTED";
-	case MAKE_DPHRESULT(270):return "DPERR_BUSY";
-	case MAKE_DPHRESULT(280):return "DPERR_USERCANCEL";
-	case E_NOINTERFACE:return "DPERR_NOINTERFACE";
-	case MAKE_DPHRESULT(290):return "DPERR_CANNOTCREATESERVER";
-	case MAKE_DPHRESULT(300):return "DPERR_PLAYERLOST";
-	case MAKE_DPHRESULT(310):return "DPERR_SESSIONLOST";
-	case MAKE_DPHRESULT(320):return "DPERR_UNINITIALIZED";
-	case MAKE_DPHRESULT(330):return "DPERR_NONEWPLAYERS";
-	case MAKE_DPHRESULT(340):return "DPERR_INVALIDPASSWORD";
-	case MAKE_DPHRESULT(350):return "DPERR_CONNECTING";
-	case MAKE_DPHRESULT(1000):return "DPERR_BUFFERTOOLARGE";
-	case MAKE_DPHRESULT(1010):return "DPERR_CANTCREATEPROCESS";
-	case MAKE_DPHRESULT(1020):return "DPERR_APPNOTSTARTED";
-	case MAKE_DPHRESULT(1030):return "DPERR_INVALIDINTERFACE";
-	case MAKE_DPHRESULT(1040):return "DPERR_NOSERVICEPROVIDER";
-	case MAKE_DPHRESULT(1050):return "DPERR_UNKNOWNAPPLICATION";
-	case MAKE_DPHRESULT(1070):return "DPERR_NOTLOBBIED";
-	case MAKE_DPHRESULT(1080):return "DPERR_SERVICEPROVIDERLOADED";
-	case MAKE_DPHRESULT(1090):return "DPERR_ALREADYREGISTERED";
-	case MAKE_DPHRESULT(1100):return "DPERR_NOTREGISTERED";
-	case MAKE_DPHRESULT(2000):return "DPERR_AUTHENTICATIONFAILED";
-	case MAKE_DPHRESULT(2010):return "DPERR_CANTLOADSSPI";
-	case MAKE_DPHRESULT(2020):return "DPERR_ENCRYPTIONFAILED";
-	case MAKE_DPHRESULT(2030):return "DPERR_SIGNFAILED";
-	case MAKE_DPHRESULT(2040):return "DPERR_CANTLOADSECURITYPACKAGE";
-	case MAKE_DPHRESULT(2050):return "DPERR_ENCRYPTIONNOTSUPPORTED";
-	case MAKE_DPHRESULT(2060):return "DPERR_CANTLOADCAPI";
-	case MAKE_DPHRESULT(2070):return "DPERR_NOTLOGGEDIN";
-	case MAKE_DPHRESULT(2080):return "DPERR_LOGONDENIED";
-
-	default: return FormatHRESULT(hr);
-	}
-}
+#include "dipshit.h"
+#include "haxx.h"
 
 IDirectPlay3 *g_pDirectPlay = nullptr;
 
@@ -1230,7 +1013,7 @@ void ReadPackets()
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 {
-	InitializeCriticalSection(&g_logCritSect);
+	LogInit();
 
 	HRESULT hr;
 
@@ -1253,13 +1036,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 	// IF HOSTING LOCALLY, TRY TO MEMHAX THE CHECKSUM OUT
-#if true
-	g_uChecksum = ExtractLocalhostChecksum();
-	if (g_uChecksum != 0)
+	if (s_bLocalHost)
 	{
-		Log("I JUST STOLE THE CHECKSOME FROM JK MEMORY: %d", g_uChecksum);
+		g_uChecksum = ExtractLocalhostChecksum();
+		if (g_uChecksum != 0)
+		{
+			Log("I JUST STOLE THE CHECKSOME FROM JK MEMORY: %d", g_uChecksum);
+		}
 	}
-#endif
 
 
 	hr = CoInitialize(NULL);
@@ -1287,9 +1071,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	// establish connection via direct IP-  prevents popup of dplay UI asking for IP
 	{
-		// WARNING FOR LOCAL HOST:  if debugging multi-user sessions, cannot use 127.0.0.1  as we will not be sent other players' packets.  using the actual local adapter fixes this
-		char ipAddress[] = "192.168.5.2";//"192.168.5.3";//"127.0.0.1";
-
 		IDirectPlayLobby2* pLobby = nullptr;
 		hr = CoCreateInstance(CLSID_DirectPlayLobby, NULL, CLSCTX_INPROC_SERVER, IID_IDirectPlayLobby2, (LPVOID*)&pLobby);
 		if (hr != S_OK || pLobby == nullptr)
@@ -1300,10 +1081,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 		char* addressConnection = nullptr;
 		DWORD addressConnectionLen = 0;
-		pLobby->CreateAddress(DPSPGUID_TCPIP, DPAID_INet, ipAddress, strlen(ipAddress) + 1, addressConnection, &addressConnectionLen);//query size
+		pLobby->CreateAddress(DPSPGUID_TCPIP, DPAID_INet, s_ipAddress, strlen(s_ipAddress) + 1, addressConnection, &addressConnectionLen);//query size
 
 		addressConnection = new char[addressConnectionLen];
-		hr = pLobby->CreateAddress(DPSPGUID_TCPIP, DPAID_INet, ipAddress, strlen(ipAddress) + 1, addressConnection, &addressConnectionLen);
+		hr = pLobby->CreateAddress(DPSPGUID_TCPIP, DPAID_INet, s_ipAddress, strlen(s_ipAddress) + 1, addressConnection, &addressConnectionLen);
 		//Log("%s = DirectPlayLobby->CreateAddress", FormatDPLAYRESULT(hr));
 
 
@@ -1537,6 +1318,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	Log("EXITING");
 	Log("----------------------------------------------");
 
-	DeleteCriticalSection(&g_logCritSect);
+	LogShutdown();
 	return 0;
 }
