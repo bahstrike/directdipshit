@@ -132,239 +132,6 @@ DWORD g_uActuallyInTimestamp = 0;
 
 
 
-
-class READPACKET
-{
-private:
-	const char* raw;
-	int len;
-	int pos;
-
-public:
-	READPACKET(const char* _raw, int _len)
-	{
-		raw = _raw;
-		len = _len;
-		pos = 0;
-	}
-
-	int getCurrentPosition() const
-	{
-		return pos;
-	}
-
-	int getTotalLength() const
-	{
-		return len;
-	}
-
-	bool eof() const
-	{
-		return (pos >= len);
-	}
-
-	void skip(int n, bool breakOnNonNull=false)
-	{
-		if (breakOnNonNull)
-		{
-			for (int x = 0; x < n; x++)
-				if (readByte() != 0)
-					Log("RAWPACKET::skip assumed zeros but there arent zeros");// set a breakpoint here
-		} else
-			pos += n;
-	}
-
-	void read(void* buf, int s)
-	{
-		if ((pos + s) > len)
-			Log("RAWPACKET::read wants to read past end of buffer");
-
-		memcpy(buf, raw + pos, s);
-		pos += s;
-	}
-
-	char readByte()
-	{
-		char b;
-		read(&b, 1);
-		return b;
-	}
-
-	short readInt16()
-	{
-		short i;
-		read(&i, 2);
-		return i;
-	}
-
-	unsigned short readUInt16()
-	{
-		unsigned short i;
-		read(&i, 2);
-		return i;
-	}
-
-	int readInt32()
-	{
-		int i;
-		read(&i, 4);
-		return i;
-	}
-
-	unsigned int readUInt32()
-	{
-		unsigned int i;
-		read(&i, 4);
-		return i;
-	}
-
-	float readFloat()
-	{
-		float f;
-		read(&f, 4);
-		return f;
-	}
-
-	void readNullTermString(char* sz, int smax)
-	{
-		memset(sz, 0, smax);
-
-		for (int x = 0; x<(smax-1/*leave space for null*/); x++)
-		{
-			char c = readByte();
-			if (c == 0)
-				break;// we already memset
-
-			sz[x] = c;
-		}
-	}
-
-	void readNullTermWideString(char* sz, int max)
-	{
-		wchar_t* wcs = new wchar_t[max];
-
-		int len;
-		for (len = 0; len < max; len++)
-		{
-			wchar_t wc = (wchar_t)readUInt16();
-			if (wc == 0)
-				break;
-
-			wcs[len] = wc;
-		}
-		wcs[len] = 0;
-
-		wcstombs(sz, wcs, len);
-		sz[len] = 0;
-
-		delete[] wcs;
-	}
-};
-
-struct WRITEPACKET
-{
-private:
-	std::vector<char> buf;
-
-public:
-	void write(const void* p, int len)
-	{
-		// should optimize but im lazy
-		for(int x=0; x<len; x++)
-			buf.push_back(((const char*)p)[x]);
-	}
-
-	void writeByte(char c)
-	{
-		write(&c, 1);
-	}
-
-	void writeUInt16(unsigned short s)
-	{
-		write(&s, 2);
-	}
-
-	void writeInt16(short s)
-	{
-		write(&s, 2);
-	}
-
-	void writeInt32(int i)
-	{
-		write(&i, 4);
-	}
-
-	void writeUInt32(unsigned int i)
-	{
-		write(&i, 4);
-	}
-
-	void writeNullTermString(const char* sz)
-	{
-		int slen = strlen(sz);
-		write(sz, slen + 1/*include null*/);
-	}
-
-	void writeNullTermWideString(const wchar_t* wcs)
-	{
-		int slen = wcslen(wcs);
-		write(wcs, (slen + 1) * 2/*include null*/);
-	}
-
-	void writeFixedString(const char* sz, int max)
-	{
-		int slen = strlen(sz);
-		write(sz, slen);
-
-		for (; slen < max; slen++)
-			writeByte(0);
-	}
-
-	void writeFixedWideString_MBS(const char* sz, int max)
-	{
-		wchar_t* wcs = new wchar_t[max];
-		ZeroMemory(wcs, 2 * max);
-
-		mbstowcs(wcs, sz, strlen(sz));
-
-		write(wcs, 2 * max);
-
-		delete[] wcs;
-	}
-
-	void allocateOutputBuffer(char* &pBuf, int& pLen)
-	{
-		pLen = buf.size();
-		pBuf = new char[pLen];
-
-		memcpy(pBuf, &buf[0], pLen);
-	}
-
-	void send(DPID destination, DPID source=(DPID)-1/*will use from our known local DPID*/, bool guaranteed = false)
-	{
-		char* pBuf;
-		int pLen;
-		allocateOutputBuffer(pBuf, pLen);
-
-		g_pDirectPlay->Send((source == (DPID)-1) ? g_localPlayer : source, destination, (guaranteed ? DPSEND_GUARANTEED : 0), pBuf, pLen);
-
-		delete[] pBuf;
-	}
-
-	void dump(const char* sz)
-	{
-		char* pBuf;
-		int pLen;
-		allocateOutputBuffer(pBuf, pLen);
-
-		FILE* f = fopen(sz, "wb");
-		fwrite(pBuf, 1, pLen, f);
-		fclose(f);
-
-		delete[] pBuf;
-	}
-};
-
 enum MESSAGEID
 {
 	MSGID_ThingSync = 0x01,
@@ -940,7 +707,7 @@ void CleanupOldDumpFiles()
 	for (int dumprun = 0; dumprun < 2; dumprun++)
 	{
 		WIN32_FIND_DATA fd;
-		HANDLE hFind = FindFirstFile(LOGPATH"dplayRECV*.dmp", &fd);
+		HANDLE hFind = FindFirstFile(GenerateLogFilePath("dplayRECV*.dmp"), &fd);
 		if (hFind != INVALID_HANDLE_VALUE && hFind != NULL)
 		{
 			do {
@@ -953,9 +720,7 @@ void CleanupOldDumpFiles()
 				}
 				else
 				{
-					char szDumpFile[MAX_PATH];
-					sprintf(szDumpFile, LOGPATH"%s", fd.cFileName);
-					DeleteFile(szDumpFile);
+					DeleteFile(GenerateLogFilePath(fd.cFileName));
 				}
 			} while (FindNextFile(hFind, &fd));
 
@@ -994,7 +759,7 @@ void ReadPackets()
 
 	static int numreceived = 0;
 	char dumpfile[MAX_PATH];
-	sprintf(dumpfile, LOGPATH"dplayRECV%d.dmp", numreceived);
+	sprintf(dumpfile, GenerateLogFilePath("dplayRECV%d.dmp"), numreceived);
 	FILE* f = fopen(dumpfile, "wb");
 	fwrite(msg, 1, msgSize, f);
 	fclose(f);

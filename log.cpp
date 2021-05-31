@@ -21,7 +21,7 @@ void Log(const char* fmt, ...)
 	va_end(va);
 
 
-	FILE* f = fopen(LOGPATH"directdipshit.log", "a");
+	FILE* f = fopen(GenerateLogFilePath("directdipshit.log"), "a");
 	fwrite(buf, 1, msg_len, f);
 	fwrite("\n", 1, 1, f);
 	fclose(f);
@@ -41,6 +41,17 @@ void LogInit()
 void LogShutdown()
 {
 	DeleteCriticalSection(&g_logCritSect);
+}
+
+const char* GenerateLogFilePath(const char* szFileName)
+{
+	static char path[MAX_PATH];
+
+	strcpy(path, LOGPATH);
+	strcat(path, "\\");
+	strcat(path, szFileName);
+
+	return path;
 }
 
 // super unsafe esp for threads but im lazy

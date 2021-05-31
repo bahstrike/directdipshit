@@ -1,8 +1,7 @@
 #pragma once
 
-// Log()  should be pretty much thread-safe, for appending to a file.
-//
 
+// thread-safe for appending to logfile
 void Log(const char* fmt, ...);
 
 
@@ -10,7 +9,7 @@ void LogInit();
 void LogShutdown();
 
 
-// super unsafe esp for threads but im lazy
+// these functions may return ptrs from static buffers;  use with caution
+const char* GenerateLogFilePath(const char* szFileName);
 const char* FormatHRESULT(HRESULT hr);
-
 const char* FormatDPLAYRESULT(HRESULT hr);

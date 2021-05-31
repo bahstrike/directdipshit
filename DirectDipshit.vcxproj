@@ -153,11 +153,13 @@
     <ClCompile Include="haxx.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="packet.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="dipshit.h" />
     <ClInclude Include="haxx.h" />
     <ClInclude Include="log.h" />
+    <ClInclude Include="packet.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
