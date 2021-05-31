@@ -43,7 +43,7 @@ bool EnableDebugPrivilege()
 
 
 
-unsigned int ExtractLocalhostChecksum()
+unsigned int ExtractLocalhostChecksum(void* pChecksumAddress)
 {
 	static bool escalated = false;
 	if (!escalated)
@@ -65,7 +65,7 @@ unsigned int ExtractLocalhostChecksum()
 		return 0;
 
 	unsigned int checksum = 0;
-	ReadProcessMemory(hJK, (void*)0x00832678, &checksum, 4, NULL);
+	ReadProcessMemory(hJK, pChecksumAddress, &checksum, 4, NULL);
 
 	CloseHandle(hJK);
 

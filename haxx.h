@@ -24,4 +24,4 @@ then in the future you can just precalc_hash_0 ^ new_salt_N = current_hash
 
 // TO BE USED WHEN HOSTING JK LOCALLY-  just get the checksum value from the process directly.
 // IF THIS SHIT FAILS, YOU NEED TO RUN VEGETABLESTUDIO AS ADMIN
-unsigned int ExtractLocalhostChecksum();
+unsigned int ExtractLocalhostChecksum(void* pChecksumAddress=(void*)0x00832678/*might have to change this if not running CD copy*/);
