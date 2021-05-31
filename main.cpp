@@ -132,154 +132,6 @@ DWORD g_uActuallyInTimestamp = 0;
 
 
 
-enum MESSAGEID
-{
-	MSGID_ThingSync = 0x01,
-	MSGID_Maybe_ConsoleMessage = 0x02,
-	MSGID_Dunno_SomeSync1 = 0x04,
-	MSGID_Dunno_SomeSync2 = 0x09,
-	MSGID_Dunno_SomeSync3 = 0x0A,
-	MSGID_Dunno_SomeSync4 = 0x0B,
-
-	MSGID_Dunno_SomeSync5 = 0x16,
-	MSGID_Dunno_SomeSync6 = 0x1D,
-
-	MSGID_ServerInfo_PlayerList = 0x20,
-	MSGID_Dunno_InGameJoin = 0x21,
-	MSGID_JoinRequest = 0x22,
-	MSGID_JoinRequestResponse = 0x24,
-	MSGID_Dunno_PacketFlush = 0x28,// some kind of packet num sync-  seems to cause packetNum to be reset.  just includes uint16 of like known packetNum.  think its bidirectional message
-	MSGID_Unknown_ServerHappy = 0x29,
-	MSGID_Dunno_PlayerDamage = 0x30,
-	MSGID_HostStatus = 0x31,
-
-	MSGID_DMGORTHINGBULLSHIT = 0x3B,
-	MSGID_PlayerInfo1 = 0x39,
-	MSGID_PlayerInfo2 = 0x3A,
-};
-
-const char* MessageIDToString(MESSAGEID msgid)
-{
-	switch (msgid)
-	{
-	case MSGID_ThingSync: return "ThingSync";
-	case MSGID_Maybe_ConsoleMessage: return "Maybe_ConsoleMessage";
-	case MSGID_Dunno_SomeSync1: return "Dunno_SomeSync1";
-	case MSGID_Dunno_SomeSync2: return "Dunno_SomeSync2";
-	case MSGID_Dunno_SomeSync3: return "Dunno_SomeSync3";
-	case MSGID_Dunno_SomeSync4: return "Dunno_SomeSync4";
-	case MSGID_Dunno_SomeSync5: return "Dunno_SomeSync5";
-	case MSGID_Dunno_SomeSync6: return "Dunno_SomeSync6";
-	case DPSYS_CREATEPLAYERORGROUP: return "CREATEPLAYER";
-	case DPSYS_DESTROYPLAYERORGROUP: return "DESTROYPLAYER";
-	case MSGID_Dunno_InGameJoin: return "Dunno_InGameJoin";
-	case MSGID_JoinRequest: return "JoinRequest";
-	case MSGID_JoinRequestResponse: return "JoinRequestResponse";
-	case MSGID_Dunno_PacketFlush: return "Dunno_PacketFlush";
-	case MSGID_ServerInfo_PlayerList: return "ServerInfo_PlayerList";
-	case MSGID_Unknown_ServerHappy: return "Unknown_ServerHappy";
-	case MSGID_DMGORTHINGBULLSHIT: return "DMGORTHINGBULLSHIT";
-	case MSGID_PlayerInfo1: return "PlayerInfo1";
-	case MSGID_PlayerInfo2: return "PlayerInfo2";
-	case MSGID_Dunno_PlayerDamage: return "Dunno_PlayerDamage";
-	case MSGID_HostStatus: return "HostStatus";
-
-	default:
-		return "UNKNOWN";
-	}
-}
-
-enum SLOTFLAG
-{
-	SF_CONNECTED = 0x01,
-	SF_AVAILABLE = 0x02,
-	SF_DATAPRESENT = 0x04,
-};
-
-const char* UnsafeTmpMBS(const wchar_t* wcs)
-{
-	static char sz[1024];
-
-	int len = wcslen(wcs);
-	wcstombs(sz, wcs, len);
-	sz[len] = 0;
-
-	return sz;
-}
-
-#pragma pack(push, 1)
-struct JOINREQUEST
-{
-	char jklName[32];
-	wchar_t plrName[32];
-	char dunno[32];
-	unsigned int checksum;
-};
-#pragma pack(pop)
-
-enum JOINRESULT
-{
-	JR_OK = 0,
-	JR_BUSY=1,
-	JR_UNKNOWN=2,
-	JR_CANCEL=3,
-	JR_WRONGCHECKSUM = 4,
-	JR_GAMEFULL = 5,
-	JR_WRONGLEVEL = 6,
-};
-
-const char* JoinResultToString(JOINRESULT jr)
-{
-	switch (jr)
-	{
-	case JR_OK: return "OK";
-	case JR_BUSY: return "BUSY";
-	case JR_UNKNOWN: return "UNKNOWN";
-	case JR_CANCEL: return "CANCEL";
-	case JR_WRONGCHECKSUM: return "WRONGCHECKSUM";
-	case JR_GAMEFULL: return "GAMEFULL";
-	case JR_WRONGLEVEL: return "WRONGLEVEL";
-	default: return "unknown";
-	}
-}
-
-
-#pragma pack(push, 1)
-struct PLAYERSLOT
-{
-	SLOTFLAG flags;
-
-	// only if SF_DATAPRESENT
-	DPID dpid;
-	char name[16];
-	char extra[9];// always zeros?
-
-	bool isConnected() const { return (flags & SF_CONNECTED) != 0; }
-	bool hasData() const { return (flags & SF_DATAPRESENT) != 0; }
-
-	void clear()
-	{
-		ZeroMemory(this, sizeof(PLAYERSLOT));
-	}
-
-	void read(READPACKET& p)
-	{
-		flags = (SLOTFLAG)p.readUInt32();
-
-		if (hasData())
-			p.read((char*)this + 4, sizeof(PLAYERSLOT) - 4);
-	}
-};
-
-struct DUNNOPLAYERINFO
-{
-	char model[32];
-	char soundclass[32];
-	char saber0[32];
-	char saber1[32];
-};
-
-#pragma pack(pop)
 
 int g_nMaxPlayerSlots = 0;
 PLAYERSLOT* g_pPlayerSlots = nullptr;
@@ -333,10 +185,11 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 	unsigned short packetNum = p.readUInt16();
 
 	// blacklist some IDs for dev purposes to prevent flooding
-	bool blacklist = msgID == MSGID_ThingSync ||
-					 msgID == MSGID_Dunno_SomeSync4 ||
-					 msgID == MSGID_Dunno_SomeSync5 ||
-					 msgID == MSGID_Dunno_SomeSync6;
+	bool blacklist = false;
+	for (int x = 0; !blacklist && x < sizeof(s_uBlacklistedMsgID) / sizeof(*s_uBlacklistedMsgID); x++)
+		if (s_uBlacklistedMsgID[x] == msgID)
+			blacklist = true;
+
 
 	bool logPacket = !s_bIgnoreSyncForLog || !blacklist;
 
@@ -538,7 +391,7 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 		p.read(&plr, sizeof(plr));
 
 
-		Log("SOME PLAYERINFO!!  playerSlot:%d    model:%s   sndcls:%s    saber0:%s   saber1:%s", slotIndex, plr.model, plr.soundclass, plr.saber0, plr.saber1);
+		//Log("SOME PLAYERINFO!!  playerSlot:%d    model:%s   sndcls:%s    saber0:%s   saber1:%s", slotIndex, plr.model, plr.soundclass, plr.saber0, plr.saber1);
 
 		// might need to ack it
 		PacketNumAck(senderDpid, packetNum);
@@ -806,7 +659,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		g_uChecksum = ExtractLocalhostChecksum();
 		if (g_uChecksum != 0)
 		{
-			Log("I JUST STOLE THE CHECKSOME FROM JK MEMORY: %d", g_uChecksum);
+			Log("I JUST STOLE THE CHECKSOME FROM JK MEMORY: 0x%08X", g_uChecksum);
 		}
 	}
 

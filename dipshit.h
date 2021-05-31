@@ -10,6 +10,12 @@
 #include <vector>
 
 
+// forward declarations
+class READPACKET;
+
+
+
+#include "jklowlvl.h"
 
 ///////////////////////////////////////////////////////////////////////////
 //    WHEN PROGRAM IS RUNNING, HOLD   CTRL+ALT  FOR A SEC TO GRACEFULLY EXIT
@@ -29,8 +35,6 @@
 //
 //   LocalHost:  FALSE    USE WHEN JOINING REMOTE JK GAME     set ipAddress to a remote session.   you will connect but have to wait until another player joins in order to
 //															  scrape the checksum value from their join message.
-//
-// WARNING FOR LOCAL HOST:  if debugging multi-user sessions, cannot use 127.0.0.1  as we will not be sent other players' packets.  using the actual local adapter fixes this
 const bool s_bLocalHost = true;
 const char s_ipAddress[] = "192.168.5.2";
 
@@ -40,11 +44,23 @@ const char s_ipAddress[] = "192.168.5.2";
 #define LOGPATH "c:\\directdipshit\\"
 
 
+
+// blacklist some IDs for dev purposes to prevent logfile flooding
+const unsigned int s_uBlacklistedMsgID[] = {
+	MSGID_ThingSync,
+	MSGID_Dunno_SomeSync4,
+	MSGID_Dunno_SomeSync5,
+	MSGID_Dunno_SomeSync6,
+	MSGID_ServerInfo_PlayerList,
+};
+
+
 // whether u want a lot of the repeating sync messages in the logfile
 const bool s_bIgnoreSyncForLog = true;
 
 
 
 // our common stuff after constants
+#include "util.h"
 #include "log.h"
 #include "packet.h"
