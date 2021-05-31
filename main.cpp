@@ -900,7 +900,7 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 		int playerSlotIndex = p.readInt32();
 		int dunno2 = p.readInt32();	// not sure what this is, but seems to actually be in the directplay header itself.  might be DPID but doesnt look like (unless its byteswapped)
 
-		if (p.getTotalLength() == 44)
+		if (p.getTotalLength() < 44)
 		{
 			// some shorthand shit?  a rejoin?
 			Log("DUNNO PLRREEEEJOIN %d: ,   token %u", playerSlotIndex, dunno2);
