@@ -338,27 +338,12 @@ void CreateSession()
 	g_pDirectPlay->Close();
 }
 
-
-
-enum ThreadState {
-	Stopped,
-	Starting,
-	Running,
-	Stopping,
-};
-
-
-
-
-volatile unsigned int g_uChecksum = 0;
+unsigned int g_uChecksum = 0;
 bool g_bAttemptedJoin = false;
-volatile unsigned short g_nINGAMEJOINRequestPacketNum = 0;
-volatile unsigned int g_uInGameJoinPlayerToken = 0;
+unsigned short g_nINGAMEJOINRequestPacketNum = 0;
+unsigned int g_uInGameJoinPlayerToken = 0;
 DPID g_hostDpid = 0;
 DPID g_localPlayer = 0;// this be us
-HANDLE g_hPlayerEvent = NULL;// we're usin this as the flag for thread good & ready
-HANDLE g_hPlayerEventThread = NULL;
-volatile ThreadState g_PlayerEventThreadState = ThreadState::Stopped;
 
 DWORD g_uActuallyInTimestamp = 0;
 
@@ -746,9 +731,9 @@ struct DUNNOPLAYERINFO
 
 #pragma pack(pop)
 
-volatile int g_nMaxPlayerSlots = 0;
-PLAYERSLOT* volatile g_pPlayerSlots = nullptr;
-volatile int g_nLocalPlayerIndex = -1;
+int g_nMaxPlayerSlots = 0;
+PLAYERSLOT* g_pPlayerSlots = nullptr;
+int g_nLocalPlayerIndex = -1;
 
 int FindPlayerSlotIndexByDPID(DPID dpid, bool mustBeConnected=true)
 {
@@ -1165,109 +1150,6 @@ void EmulatePacketFromFile(const char* szDumpFile)
 	delete[] msg;
 }
 
-DWORD WINAPI PlayerEventThread(LPVOID lpParam)
-{
-	g_PlayerEventThreadState = ThreadState::Running;
-	while (g_PlayerEventThreadState == ThreadState::Running)
-	{
-		Sleep(0);//release context
-
-
-		/*The message processing thread should then use the Win32 WaitForSingleObject API to wait
-		until the event is set. Keep calling Receive until there are no more messages in the message queue. */
-		if (WaitForSingleObject(g_hPlayerEvent, 750/*dialup days were worse*/) == 0)
-		{
-			// gotcha bitch- lets get ur data
-			HRESULT hr;
-
-			DPID remotePlayer=0;// host?
-			DWORD msgSize = 0;
-			hr = g_pDirectPlay->Receive(&remotePlayer, &g_localPlayer, DPRECEIVE_ALL, nullptr, &msgSize);
-			if (hr == DPERR_NOMESSAGES)
-				continue;
-
-			if (msgSize <= 0)
-			{
-				Log("PLR EVENT RECEIVE WTF MSG 0 LEN  SUX DIX");
-				continue;
-			}
-
-			//Log("PLAYER EVENT-  GOTTA Receive()  and see what it wants");
-
-			char* msg = new char[msgSize];
-			hr = g_pDirectPlay->Receive(&remotePlayer, &g_localPlayer, DPRECEIVE_ALL, msg, &msgSize);
-
-			static int numreceived = 0;
-			char dumpfile[MAX_PATH];
-			sprintf(dumpfile, LOGPATH"dplayRECV%d.dmp", numreceived);
-			FILE* f = fopen(dumpfile, "wb");
-			fwrite(msg, 1, msgSize, f);
-			fclose(f);
-
-
-			READPACKET p(msg, msgSize);
-			ProcessPacket(remotePlayer, p, numreceived);
-
-			//Log("DUMPED NET PACKET TO: %s", dumpfile);
-
-			numreceived++;
-			delete[] msg;
-		}
-
-		// asdlkfjas nothin to do here
-	}
-
-	g_PlayerEventThreadState = ThreadState::Stopped;
-	return 0;
-}
-
-void StartPlayerEventThread()
-{
-	// if started bail
-	if (g_hPlayerEvent != NULL)
-		return;
-
-	// spawn thread
-	g_PlayerEventThreadState = ThreadState::Starting;
-	g_hPlayerEventThread = CreateThread(NULL, 0, PlayerEventThread, NULL, 0, NULL);
-	while (g_PlayerEventThreadState == ThreadState::Starting)
-		Sleep(0);
-
-	g_hPlayerEvent = CreateEvent(NULL, TRUE, FALSE, "DDIPSHITPLR");
-}
-
-void StopPlayerEventThread()
-{
-	// if stopped bail
-	if (g_hPlayerEvent == NULL)
-		return;
-
-	// kill thread
-	if (g_PlayerEventThreadState == ThreadState::Running)
-	{
-		// gracefully
-		g_PlayerEventThreadState = ThreadState::Stopping;
-		while (g_PlayerEventThreadState != ThreadState::Stopped)
-			Sleep(0);// hopefully-  could add timer
-	}
-	else
-		TerminateThread(g_hPlayerEventThread, 0);// or not
-
-
-	if (g_hPlayerEventThread != NULL)
-	{
-		CloseHandle(g_hPlayerEventThread);
-		g_hPlayerEventThread = NULL;
-	}
-
-	if (g_hPlayerEvent != NULL)
-	{
-		CloseHandle(g_hPlayerEvent);
-		g_hPlayerEvent = NULL;
-	}
-}
-
-
 void CleanupOldDumpFiles()
 {
 	int dumpfiles = 0;
@@ -1303,6 +1185,46 @@ void CleanupOldDumpFiles()
 		}
 	}
 	
+}
+
+void ReadPackets()
+{
+	// gotcha bitch- lets get ur data
+	HRESULT hr;
+
+	DPID remotePlayer = 0;// host?
+	DWORD msgSize = 0;
+	hr = g_pDirectPlay->Receive(&remotePlayer, &g_localPlayer, DPRECEIVE_ALL, nullptr, &msgSize);
+	if (hr == DPERR_NOMESSAGES)
+		return;
+
+	if (msgSize <= 0)
+	{
+		Log("PLR EVENT RECEIVE WTF MSG 0 LEN  SUX DIX");
+		return;
+	}
+
+	//Log("PLAYER EVENT-  GOTTA Receive()  and see what it wants");
+
+	char* msg = new char[msgSize];
+	hr = g_pDirectPlay->Receive(&remotePlayer, &g_localPlayer, DPRECEIVE_ALL, msg, &msgSize);
+
+	static int numreceived = 0;
+	char dumpfile[MAX_PATH];
+	sprintf(dumpfile, LOGPATH"dplayRECV%d.dmp", numreceived);
+	FILE* f = fopen(dumpfile, "wb");
+	fwrite(msg, 1, msgSize, f);
+	fclose(f);
+
+
+	READPACKET p(msg, msgSize);
+	ProcessPacket(remotePlayer, p, numreceived);
+
+	//Log("DUMPED NET PACKET TO: %s", dumpfile);
+
+	numreceived++;
+	delete[] msg;
+
 }
 
 
@@ -1438,9 +1360,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 		localName.lpszShortName = wcs;
 
-		StartPlayerEventThread();
-
-		hr = g_pDirectPlay->CreatePlayer(&g_localPlayer, &localName, g_hPlayerEvent, NULL/*jk prolly wants a packet from us*/, 0/*size*/, 0/*joining-  nonserver and nonspectator*/);
+		hr = g_pDirectPlay->CreatePlayer(&g_localPlayer, &localName, NULL, NULL, 0, 0/*joining-  nonserver and nonspectator*/);
 		//Log("%s = DirectPlay->CreatePlayer", FormatDPLAYRESULT(hr));
 
 
@@ -1451,6 +1371,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		Log("IN SESSION.. WAITING FOREVER UNTIL U HOLD CTRL+ALT");
 		for (;;)
 		{
+			ReadPackets();
+
+
 			// wait until we have a JKL name and a checksum, then we can try to join!!
 			if (!g_bAttemptedJoin && g_szJKLName != nullptr && g_uChecksum != 0)
 			{
@@ -1588,8 +1511,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		g_pDirectPlay->DestroyPlayer(g_localPlayer);
 		g_localPlayer = 0;
 	}
-
-	StopPlayerEventThread();
 
 	if (g_pPlayerTemplate != nullptr)
 	{
