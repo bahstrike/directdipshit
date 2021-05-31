@@ -571,7 +571,7 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 					 msgID == MSGID_Dunno_SomeSync5 ||
 					 msgID == MSGID_Dunno_SomeSync6;
 
-	bool logPacket = !IGNORESYNCMSG || !blacklist;
+	bool logPacket = !s_bIgnoreSyncForLog || !blacklist;
 
 	if(logPacket)
 		Log("ProcessPacket (dump:%d,  len:%d) senderDpid:%d  msgID:0x%02X  packetNum:%d  msg:%s", dumpIndex, p.getTotalLength(), senderDpid, msgID, packetNum, MessageIDToString(msgID));
@@ -835,7 +835,7 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 			}
 		}
 
-		if (!IGNORESYNCMSG)
+		if (!s_bIgnoreSyncForLog)
 			Log(msg);
 
 		msgID = msgID;
@@ -870,7 +870,7 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 		unsigned short dunno1 = p.readUInt16();
 		int dunno2 = p.readInt32();
 
-		if (!IGNORESYNCMSG)
+		if (!s_bIgnoreSyncForLog)
 			Log("DUNSYNC5   d1:0x%04X   d2:%d", dunno1, dunno2);
 	}
 	else if (msgID == MSGID_Dunno_SomeSync6)
@@ -880,7 +880,7 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 
 		float f1maybe = p.readFloat();
 
-		if (!IGNORESYNCMSG)
+		if (!s_bIgnoreSyncForLog)
 			Log("DERPSONC6   d1:0x%04X   d2:%d   f1maybe:%0.02f", dunno1, dunno2, f1maybe);
 	}
 	else if (msgID == MSGID_Dunno_SomeSync1)
@@ -902,7 +902,7 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 		float f10 = p.readFloat();
 		
 		
-		if (!IGNORESYNCMSG)
+		if (!s_bIgnoreSyncForLog)
 			Log("DOINK1   d1:0x%04X  d2:0x%04X  d3:0x%04X  d4:0x%04X  f1:%0.02f  f2:%0.02f  f3:%0.02f  f4:%0.02f  f5:%0.02f  f6:%0.02f  f7:%0.02f  f8:%0.02f  f9:%0.02f  f10:%0.02f  ",
 				dunno1, dunno2, dunno3, dunno4, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10);
 	}

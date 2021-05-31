@@ -20,7 +20,7 @@
 #define LOGPATH "c:\\directdipshit\\"
 
 
-#define IGNORESYNCMSG 1
+const bool s_bIgnoreSyncForLog = true;
 
 
 // WARNING FOR LOCAL HOST:  if debugging multi-user sessions, cannot use 127.0.0.1  as we will not be sent other players' packets.  using the actual local adapter fixes this
