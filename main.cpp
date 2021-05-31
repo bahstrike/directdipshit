@@ -925,33 +925,28 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 	else if (msgID == MSGID_Dunno_InGameJoin)
 	{
 		int playerSlotIndex = p.readInt32();
-		int dunno2 = p.readInt32();	// not sure what this is, but seems to actually be in the directplay header itself.  might be DPID but doesnt look like (unless its byteswapped)
+		int joinToken = p.readInt32();	// not sure what this is, but seems to actually be in the directplay header itself.  might be DPID but doesnt look like (unless its byteswapped)
 
-		if (p.getTotalLength() < 44)
+		if (p.getTotalLength() > 44)
 		{
-			// some shorthand shit?  a rejoin?
-			Log("DUNNO PLRREEEEJOIN %d: ,   token %u", playerSlotIndex, dunno2);
+			Log("ERRMM OOOOOOPS 0x21  CAN ACTUALLY BE LONGER");
 		}
-		else {
 
-			// player name string in unicode  but maybe some other stuff
-			wchar_t wcs[16];
-			p.read(wcs, sizeof(wcs));
+		// player name string in unicode  but maybe some other stuff
+		wchar_t wcs[16];
+		p.read(wcs, sizeof(wcs));
 
-			unsigned int dunno3 = p.readUInt32();
+		Log("DUNNO PLRJOIN %d:  %s   token:0x%08X", playerSlotIndex, UnsafeTmpMBS(wcs), joinToken);
 
-			Log("DUNNO PLRJOIN %d:  %s     (%u),   token %u", playerSlotIndex, UnsafeTmpMBS(wcs), dunno3, dunno2);
+		// hopefully this is OUR message
+		Log("HOPEFULLY ITS FOR US- STEALING VALUES");
+		g_nLocalPlayerIndex = playerSlotIndex;
 
-			// hopefully this is OUR message
-			Log("HOPEFULLY ITS FOR US- STEALING VALUES");
-			g_nLocalPlayerIndex = playerSlotIndex;
+		g_uInGameJoinPlayerToken = joinToken;
 
-			g_uInGameJoinPlayerToken = dunno2;
+		g_nINGAMEJOINRequestPacketNum = packetNum;
 
-			g_nINGAMEJOINRequestPacketNum = packetNum;
-
-			g_uActuallyInTimestamp = GetTickCount();
-		}
+		g_uActuallyInTimestamp = GetTickCount();
 	}
 	else if (msgID == MSGID_Dunno_PacketFlush)
 	{
