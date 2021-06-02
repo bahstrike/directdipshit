@@ -69,8 +69,6 @@ BOOL FAR PASCAL DPlayEnumSessions(
 	return (TRUE);
 }*/
 
-DPNAME* g_pPlayerTemplate = nullptr;
-
 BOOL FAR PASCAL DPlayEnumPlayers(
 	DPID            dpId,
 	DWORD           dwPlayerType,
@@ -84,13 +82,6 @@ BOOL FAR PASCAL DPlayEnumPlayers(
 	szPlayerName[playerNameLen] = 0;
 
 	Log("FOUND PLAYER \"%s\"   DPID: %d", szPlayerName, dpId);
-
-	// steal this shit so we have a compatible player struct
-	if (g_pPlayerTemplate == nullptr)
-	{
-		g_pPlayerTemplate = new DPNAME;
-		memcpy(g_pPlayerTemplate, lpName, sizeof(DPNAME));
-	}
 
 	return (TRUE);
 }
@@ -708,13 +699,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		//Log("%s = DirectPlay->EnumPlayers", FormatDPLAYRESULT(hr));
 
 
-		// copy crap from enumplayers
+
+
 		DPNAME localName;
 		ZeroMemory(&localName, sizeof(DPNAME));
 		localName.dwSize = sizeof(DPNAME);
-
-		if (g_pPlayerTemplate != nullptr)
-			memcpy(&localName, g_pPlayerTemplate, sizeof(DPNAME));
 
 		// haxx name
 		int slen = strlen(PLAYERNAME);
@@ -874,12 +863,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	{
 		g_pDirectPlay->DestroyPlayer(g_localPlayer);
 		g_localPlayer = 0;
-	}
-
-	if (g_pPlayerTemplate != nullptr)
-	{
-		delete g_pPlayerTemplate;
-		g_pPlayerTemplate = nullptr;
 	}
 
 	if (g_pSession != nullptr)
