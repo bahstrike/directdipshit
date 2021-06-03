@@ -58,35 +58,6 @@ BOOL FAR PASCAL DPlayEnumSessions(
 }
 
 
-/*BOOL FAR PASCAL DPlayEnumGroups(
-	DPID            dpId,
-	DWORD           dwPlayerType,
-	LPCDPNAME       lpName,
-	DWORD           dwFlags,
-	LPVOID          lpContext)
-{
-
-	return (TRUE);
-}*/
-
-BOOL FAR PASCAL DPlayEnumPlayers(
-	DPID            dpId,
-	DWORD           dwPlayerType,
-	LPCDPNAME       lpName,
-	DWORD           dwFlags,
-	LPVOID          lpContext)
-{
-	int playerNameLen = wcslen(lpName->lpszShortName);
-	char* szPlayerName = new char[playerNameLen + 1];
-	wcstombs(szPlayerName, lpName->lpszShortName, playerNameLen);
-	szPlayerName[playerNameLen] = 0;
-
-	Log("FOUND PLAYER \"%s\"   DPID: %d", szPlayerName, dpId);
-
-	return (TRUE);
-}
-
-
 void CreateSession()
 {
 	HRESULT hr;
@@ -454,7 +425,23 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 	else if (msgID == MSGID_Dunno_SomeSync4)
 	{
 		// prolly another variable-length
-#if false
+#if true
+		int thingIndex = p.readInt32();
+		unsigned int jkFlags = p.readUInt32();
+		unsigned int lifeleftMS = p.readUInt32();
+		unsigned short sig = p.readUInt16();
+		unsigned short collide = p.readUInt16();
+
+		float px = p.readFloat();
+		float py = p.readFloat();
+		float pz = p.readFloat();
+
+		unsigned int thingFlags = p.readUInt32();
+		unsigned int geoMode = p.readUInt32();
+
+		Log("MNTHINGSYNCF:  id:%d   jkflags:0x%08X   lifeleft:%u    sig:%u    collide:%u      POS:%0.2f/%0.2f/%0.2f      thingFlags:0x%08X     geo:%d",
+			thingIndex, jkFlags, lifeleftMS, sig, collide, px, py, pz, thingFlags, geoMode);
+#else
 		int thingIndex = p.readInt32();
 		int dunno1 = p.readInt32();
 		int dunno2 = p.readInt32();
@@ -677,8 +664,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	ZeroMemory(&sessionDesc, sizeof(DPSESSIONDESC2));
 	sessionDesc.dwSize = sizeof(DPSESSIONDESC2);
 	sessionDesc.guidApplication = *GimmeJKGUID();
-	hr = g_pDirectPlay->EnumSessions(&sessionDesc, 0, DPlayEnumSessions, NULL/*hWnd*/, DPENUMSESSIONS_AVAILABLE);
-	//Log("%s = DirectPlay->EnumSessions", FormatDPLAYRESULT(hr));
+	hr = g_pDirectPlay->EnumSessions(&sessionDesc, 0, DPlayEnumSessions, NULL, DPENUMSESSIONS_AVAILABLE);
 	Log("ENUMSESSIONS END");
 #endif
 
@@ -689,16 +675,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	if (g_pSession != nullptr)
 	{
 		hr = g_pDirectPlay->Open(g_pSession, DPOPEN_JOIN);
-		//Log("%s = DirectPlay->Open(DPOPEN_JOIN)", FormatDPLAYRESULT(hr));
-
-		// JK doesnt seem to use groups..
-		/*hr = g_pDirectPlay->EnumGroups(NULL, DPlayEnumGroups, NULL, 0);
-		Log("%s = DirectPlay->EnumSessions", FormatDPLAYRESULT(hr));*/
-
-		hr = g_pDirectPlay->EnumPlayers(NULL, DPlayEnumPlayers, NULL, 0);
-		//Log("%s = DirectPlay->EnumPlayers", FormatDPLAYRESULT(hr));
-
-
 
 
 		DPNAME localName;
