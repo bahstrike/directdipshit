@@ -43,6 +43,9 @@ const char s_ipAddress[] = "192.168.5.2";
 // must end with a slash  (primitive preprocessor string cats)
 #define LOGPATH "c:\\directdipshit\\"
 
+// must end with a slash
+#define EPISODEPATH "C:\\Users\\Strike\\Desktop\\JK\\Episode\\"
+
 
 
 // blacklist some IDs for dev purposes to prevent logfile flooding

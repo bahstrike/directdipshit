@@ -5,6 +5,8 @@ IDirectPlay3 *g_pDirectPlay = nullptr;
 
 DPSESSIONDESC2* g_pSession = nullptr;
 
+char* g_szSessionName = nullptr;
+char* g_szEpisodeName = nullptr;
 char* g_szJKLName = nullptr;
 
 
@@ -28,22 +30,38 @@ BOOL FAR PASCAL DPlayEnumSessions(
 	Log("FOUND SESSION \"%s\"  players %d/%d", szSessionName, lpSessionDesc->dwCurrentPlayers, lpSessionDesc->dwMaxPlayers);
 
 
-	// extract and keep JKL name for later use in joinrequest
-	for (int i = sessionNameLen - 1; i >= 0; i--)
+	int sPos = 0;
+	int lastsPos = 0;
+	for (; ;)
 	{
-		char c = szSessionName[i];
-		if (c == ':')
+		char c = szSessionName[sPos++];
+		if (c == ':' || c == 0)
 		{
-			int jklLen = sessionNameLen - i;
-			g_szJKLName = new char[jklLen];
-			strcpy(g_szJKLName, szSessionName + i + 1);
+			int slen = sPos - lastsPos - 1;
 
-			//Log("Stored JKL name %s  for later use in joinrequest", g_szJKLName);
+			if (g_szSessionName == nullptr)
+			{
+				g_szSessionName = new char[slen+1];
+				memcpy(g_szSessionName, &szSessionName[lastsPos], slen);
+				g_szSessionName[slen] = 0;
+			} else if (g_szEpisodeName == nullptr)
+			{
+				g_szEpisodeName = new char[slen + 1];
+				memcpy(g_szEpisodeName, &szSessionName[lastsPos], slen);
+				g_szEpisodeName[slen] = 0;
+			}
+			else {
+				g_szJKLName = new char[slen + 1];
+				memcpy(g_szJKLName, &szSessionName[lastsPos], slen);
+				g_szJKLName[slen] = 0;
+			}
 
-			break;
+			lastsPos = sPos;
+
+			if (c == 0)
+				break;
 		}
 	}
-
 
 	delete[] szSessionName;
 
@@ -99,6 +117,11 @@ DWORD g_uActuallyInTimestamp = 0;
 int g_nMaxPlayerSlots = 0;
 PLAYERSLOT* g_pPlayerSlots = nullptr;
 int g_nLocalPlayerIndex = -1;
+
+
+JKTHING* g_pThings = nullptr;
+int g_nNumThings = 0;
+int g_nMaxThings = 0;
 
 
 
@@ -622,6 +645,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 #endif
 
 
+#if true
+	Log("LOAD LEVEL");
+
+	LoadLevel(g_szEpisodeName, g_szJKLName, g_pThings, g_nNumThings, g_nMaxThings);
+
+#endif
+
 
 #if true
 	Log("SESSION DETAILS BEGIN");
@@ -782,10 +812,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	g_nMaxPlayerSlots = 0;
 	g_nLocalPlayerIndex = -1;
 
+	if (g_pThings != nullptr)
+	{
+		delete[] g_pThings;
+		g_pThings = nullptr;
+	}
+
 	if (g_szJKLName != nullptr)
 	{
 		delete[] g_szJKLName;
 		g_szJKLName = nullptr;
+	}
+
+	if (g_szEpisodeName != nullptr)
+	{
+		delete[] g_szEpisodeName;
+		g_szEpisodeName = nullptr;
+	}
+
+	if (g_szSessionName != nullptr)
+	{
+		delete[] g_szSessionName;
+		g_szSessionName = nullptr;
 	}
 
 	if (g_localPlayer != 0)

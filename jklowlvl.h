@@ -87,6 +87,22 @@ struct DUNNOPLAYERINFO
 };
 
 
+struct JKTHING
+{
+	int thingNum;
+	char tplName[32];
+	char name[32];
+	float px;
+	float py;
+	float pz;
+	float pitch;
+	float yaw;
+	float roll;
+	int sector;
+};
+
+
+void LoadLevel(const char* szEpisodeName, const char* szJKLFilename, JKTHING* &pThings, int& nNumThings, int& nMaxThings);
 
 
 
