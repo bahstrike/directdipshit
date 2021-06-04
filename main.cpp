@@ -57,7 +57,7 @@ BOOL FAR PASCAL DPlayEnumSessions(
 	return (TRUE);
 }
 
-
+#if 0
 void CreateSession()
 {
 	HRESULT hr;
@@ -82,6 +82,7 @@ void CreateSession()
 	Log("Closing Session");
 	g_pDirectPlay->Close();
 }
+#endif
 
 unsigned int g_uChecksum = 0;
 bool g_bAttemptedJoin = false;
@@ -98,6 +99,8 @@ DWORD g_uActuallyInTimestamp = 0;
 int g_nMaxPlayerSlots = 0;
 PLAYERSLOT* g_pPlayerSlots = nullptr;
 int g_nLocalPlayerIndex = -1;
+
+
 
 int FindPlayerSlotIndexByDPID(DPID dpid, bool mustBeConnected=true)
 {
@@ -158,6 +161,7 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 	if(logPacket)
 		Log("ProcessPacket (dump:%d,  len:%d) senderDpid:%d  msgID:0x%02X  packetNum:%d  msg:%s", dumpIndex, p.getTotalLength(), senderDpid, msgID, packetNum, MessageIDToString(msgID));
 
+
 	if (msgID == MSGID_HostStatus)
 	{
 		// for 118 bytes
@@ -188,46 +192,6 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 			d1, d2, d3, d4, f1, f2, f3, sab0, sab1, d5, d6, d7, d8, d9, d10);
 
 
-	} else if (msgID == DPSYS_CREATEPLAYERORGROUP)
-	{
-		DWORD playerType = p.readUInt32();//might not have a full struct for 0 type
-
-		DPMSG_CREATEPLAYERORGROUP createPlayer;
-		createPlayer.dwType = msgID;
-		createPlayer.dwPlayerType = playerType;
-
-		if (playerType == DPPLAYERTYPE_PLAYER)
-		{
-			p.read((char*)&createPlayer + 8/*we already read the message ID and player type*/, sizeof(DPMSG_CREATEPLAYERORGROUP) - 8);
-
-			Log("PLAYERCREATE plrName:%s", UnsafeTmpMBS(createPlayer.dpnName.lpszShortName));
-		}
-		else if (playerType == 0/*DPPLAYERTYPE_GROUP   i dunno if JK supports groups-  they might be usin some shorthand shit here for 0*/)
-		{
-			unsigned short dunno = p.readUInt16();
-			Log("PLAYERCREATE  SHORTHAND   dunno:%d", dunno);
-		}
-
-	} else 	if (msgID == DPSYS_DESTROYPLAYERORGROUP)
-	{
-		DWORD playerType = p.readUInt32();//might not have a full struct for 0 type
-
-		DPMSG_DESTROYPLAYERORGROUP destroyPlayer;
-		destroyPlayer.dwType = msgID;
-		destroyPlayer.dwPlayerType = playerType;
-
-		// DIDNT ACTUALLY TEST IF THEY USE SHORTHAND FOR DESTROY  DURING CUSTOM LEVELS,  BUT I MEAN... PROBABLY..  MIGHT AS WELL ATTEMPT TO SUPPORT (not like we usin the data anyway)
-
-		if (playerType == DPPLAYERTYPE_PLAYER)
-		{
-			p.read((char*)&destroyPlayer + 8/*we already read the message ID and player type*/, sizeof(DPMSG_DESTROYPLAYERORGROUP) - 8);
-
-			Log("PLAYERDESTROY plrName:%s", UnsafeTmpMBS(destroyPlayer.dpnName.lpszShortName));
-		} else if (playerType == 0/*DPPLAYERTYPE_GROUP   i dunno if JK supports groups-  they might be usin some shorthand shit here for 0*/)
-		{
-			unsigned short dunno = p.readUInt16();
-			Log("PLAYERDESTROY  SHORTHAND   dunno:%d", dunno);
-		}
 	} else if (msgID == MSGID_ServerInfo_PlayerList)
 	{
 		int dunno2 = p.readInt32();
@@ -298,14 +262,17 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 		Log("DUNNO PLRJOIN %d:  %s   token:0x%08X", playerSlotIndex, UnsafeTmpMBS(wcs), joinToken);
 
 		// hopefully this is OUR message
-		Log("HOPEFULLY ITS FOR US- STEALING VALUES");
-		g_nLocalPlayerIndex = playerSlotIndex;
+		if (g_nLocalPlayerIndex == -1)
+		{
+			Log("HOPEFULLY ITS FOR US- STEALING VALUES");
+			g_nLocalPlayerIndex = playerSlotIndex;
 
-		g_uInGameJoinPlayerToken = joinToken;
+			g_uInGameJoinPlayerToken = joinToken;
 
-		g_nINGAMEJOINRequestPacketNum = packetNum;
+			g_nINGAMEJOINRequestPacketNum = packetNum;
 
-		g_uActuallyInTimestamp = GetTickCount();
+			g_uActuallyInTimestamp = GetTickCount();
+		}
 	}
 	else if (msgID == MSGID_Dunno_PacketFlush)
 	{
@@ -425,7 +392,6 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 	else if (msgID == MSGID_Dunno_SomeSync4)
 	{
 		// prolly another variable-length
-#if true
 		int thingIndex = p.readInt32();
 		unsigned int jkFlags = p.readUInt32();
 		unsigned int lifeleftMS = p.readUInt32();
@@ -439,29 +405,9 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 		unsigned int thingFlags = p.readUInt32();
 		unsigned int geoMode = p.readUInt32();
 
-		Log("MNTHINGSYNCF:  id:%d   jkflags:0x%08X   lifeleft:%u    sig:%u    collide:%u      POS:%0.2f/%0.2f/%0.2f      thingFlags:0x%08X     geo:%d",
-			thingIndex, jkFlags, lifeleftMS, sig, collide, px, py, pz, thingFlags, geoMode);
-#else
-		int thingIndex = p.readInt32();
-		int dunno1 = p.readInt32();
-		int dunno2 = p.readInt32();
-		unsigned int dunno3 = p.readUInt32();
-
-		float f1 = p.readFloat();
-		float f2 = p.readFloat();
-		float f3 = p.readFloat();
-
-		unsigned int dunno4 = p.readUInt32();
-		int dunno5 = p.readInt32();
-		int dunno6 = p.readInt32();
-		float f4 = p.readFloat();
-		int dunno7 = p.readInt32();
-		float f5 = p.readFloat();
-
-		if(!ignoreSyncMsg)
-			Log("DUNNOSYNC (%d):  d1:%d  d2:%d  d3:0x%08X   POS:%0.2f/%0.2f/%0.2f   d4:0x%08X   d5:%d   d6:%d    f4:%f   d7:%d   f5:%f",
-				thingIndex, dunno1, dunno2, dunno3, f1, f2, f3, dunno4, dunno5, f4, dunno7, f5);
-#endif
+		if (!s_bIgnoreSyncForLog)
+			Log("MNTHINGSYNCF:  id:%d   jkflags:0x%08X   lifeleft:%u    sig:%u    collide:%u      POS:%0.2f/%0.2f/%0.2f      thingFlags:0x%08X     geo:%d",
+				thingIndex, jkFlags, lifeleftMS, sig, collide, px, py, pz, thingFlags, geoMode);
 	}
 	else if (msgID == MSGID_Dunno_SomeSync5)
 	{
@@ -480,6 +426,13 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 
 		if (!s_bIgnoreSyncForLog)
 			Log("DERPSONC6   d1:0x%04X   d2:%d   f1maybe:%0.02f", dunno1, dunno2, f1maybe);
+	}
+	else if (msgID == MSGID_Dunno_SyncSectorAlt)
+	{
+		unsigned short sectorID = p.readUInt16();
+		unsigned short sectorFlags = p.readUInt16();
+
+		Log("SYNCSECTORALT:   sectorID:%d    sectorFlags:0x%04X", sectorID, sectorFlags);
 	}
 	else if (msgID == MSGID_Dunno_SomeSync1)
 	{

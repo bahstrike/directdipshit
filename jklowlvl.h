@@ -6,6 +6,7 @@ enum MESSAGEID
 {
 	MSGID_ThingSync = 0x01,
 	MSGID_Maybe_ConsoleMessage = 0x02,
+	MSGID_Dunno_SyncSectorAlt = 0x03,
 	MSGID_Dunno_SomeSync1 = 0x04,
 	MSGID_Dunno_SomeSync2 = 0x09,
 	MSGID_Dunno_SomeSync3 = 0x0A,
