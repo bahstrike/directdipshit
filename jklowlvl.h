@@ -70,6 +70,8 @@ public:
 	char name[16];
 	char extra[9];// always zeros?
 
+	int thingIndex;
+
 	bool isConnected() const { return (flags & SF_CONNECTED) != 0; }
 	bool hasData() const { return (flags & SF_DATAPRESENT) != 0; }
 

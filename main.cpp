@@ -224,18 +224,23 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 		//Log("Server info:  host DPID:%d   maxPlayers:%d", g_hostDpid, maxPlayerEntries);
 
 
-		if (g_pPlayerSlots != nullptr)
+		/*if (g_pPlayerSlots != nullptr)
 		{
 			delete[] g_pPlayerSlots;
 			g_pPlayerSlots = nullptr;
 		}
-		g_nMaxPlayerSlots = 0;
+		g_nMaxPlayerSlots = 0;*/
 
 
 		if (maxPlayerEntries > 0)
 		{
-			g_nMaxPlayerSlots = maxPlayerEntries;
-			g_pPlayerSlots = new PLAYERSLOT[g_nMaxPlayerSlots];
+			if (g_pPlayerSlots == nullptr)
+			{
+				Log("RECEIVED PLAYERLIST BUT DIDNT HAVE SLOTS ALLOCATED;  EMERGENCY ALLOCATE");
+
+				g_nMaxPlayerSlots = maxPlayerEntries;
+				g_pPlayerSlots = new PLAYERSLOT[g_nMaxPlayerSlots];
+			}
 
 			for (int x = 0; x < g_nMaxPlayerSlots; x++)
 				g_pPlayerSlots[x].read(p);
@@ -646,9 +651,34 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 #if true
+	if (g_szEpisodeName == nullptr || g_szJKLName == nullptr)
+		goto cleanup;
+
 	Log("LOAD LEVEL");
 
 	LoadLevel(g_szEpisodeName, g_szJKLName, g_pThings, g_nNumThings, g_nMaxThings);
+
+
+	{
+		std::vector<int> walkplayerThings;
+		for (int x = 0; x < g_nNumThings; x++)
+		{
+			JKTHING& thing = g_pThings[x];
+
+			if (!_stricmp(thing.tplName, "walkplayer"))
+				walkplayerThings.push_back(thing.thingNum);
+		}
+
+		g_nMaxPlayerSlots = walkplayerThings.size();
+		g_pPlayerSlots = new PLAYERSLOT[g_nMaxPlayerSlots];
+		for (int x = 0; x < g_nMaxPlayerSlots; x++)
+		{
+			PLAYERSLOT& slot = g_pPlayerSlots[x];
+
+			slot.clear();
+			slot.thingIndex = walkplayerThings[x];
+		}
+	}
 
 #endif
 
@@ -801,7 +831,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 #endif
 
 
-
+cleanup:
 	Log("CLEANUP");
 
 	if (g_pPlayerSlots != nullptr)

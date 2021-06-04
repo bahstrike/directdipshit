@@ -58,7 +58,11 @@ void PLAYERSLOT::read(READPACKET& p)
 	flags = (SLOTFLAG)p.readUInt32();
 
 	if (hasData())
-		p.read((char*)this + 4, sizeof(PLAYERSLOT) - 4);
+	{
+		dpid = (DPID)p.readUInt32();
+		p.read(name, 16);
+		p.skip(9);// always zeros?
+	}
 }
 
 
