@@ -162,6 +162,11 @@ void WRITEPACKET::writeUInt32(unsigned int i)
 	write(&i, 4);
 }
 
+void WRITEPACKET::writeFloat(float f)
+{
+	write(&f, 4);
+}
+
 void WRITEPACKET::writeNullTermString(const char* sz)
 {
 	int slen = strlen(sz);

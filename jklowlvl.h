@@ -101,6 +101,16 @@ struct JKTHING
 	float yaw;
 	float roll;
 	int sector;
+
+	unsigned short attachFlags;
+	unsigned short maybeThingSig;
+	float vx;
+	float vy;
+	float vz;
+	float pitchVel;
+	float yawVel;
+	float rollVel;
+	float aimPitch;
 };
 
 

@@ -359,19 +359,37 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 		msg[0] = 0;
 
 		int thingIndex = p.readInt32();
+		JKTHING* pThing = nullptr;
+		if (thingIndex >= 0 && thingIndex < g_nMaxThings)
+			pThing = &g_pThings[thingIndex];
+		else
+			Log("CANT FIND THING #%d", thingIndex);
+
 		unsigned short attachFlags = p.readUInt16();
 		unsigned short maybeThingSig = p.readUInt16();
 
 		float px = p.readFloat();
 		float py = p.readFloat();
 		float pz = p.readFloat();
-		
+
 		float pitch = p.readFloat();
 		float yaw = p.readFloat();
 		float roll = p.readFloat();
-
+		
 		sprintf(msg + strlen(msg), "THINGSYNC (%d): attachFlags:0x%04X  thingsig?:%d  POS:%0.2f/%0.2f/%0.2f  PYR:%0.2f/%0.2f/%0.2f  ",
 			thingIndex, attachFlags, maybeThingSig, px, py, pz, pitch, yaw, roll);
+
+		if (pThing != nullptr)
+		{
+			pThing->attachFlags = attachFlags;
+			pThing->maybeThingSig = maybeThingSig;
+			pThing->px = px;
+			pThing->py = py;
+			pThing->pz = pz;
+			pThing->pitch = pitch;
+			pThing->yaw = yaw;
+			pThing->roll = roll;
+		}
 
 		//p.getTotalLength()
 
@@ -384,12 +402,19 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 		if (isMoveTypePhysics)
 		{
 			unsigned int physicsFlags = p.readUInt32();
-
+			
 			float vx = p.readFloat();
 			float vy = p.readFloat();
 			float vz = p.readFloat();
 
 			sprintf(msg + strlen(msg), " physicsflags:0x%08X  VEL:%0.2f/%0.2f/%0.2f  ", physicsFlags, vx, vy, vz);
+
+			if (pThing != nullptr)
+			{
+				pThing->vx = vx;
+				pThing->vy = vy;
+				pThing->vz = vz;
+			}
 
 
 			bool hasAngVel = (p.getTotalLength() >= 64);
@@ -401,6 +426,13 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 				float rollVel = p.readFloat();
 
 				sprintf(msg + strlen(msg), "  ANGVEL:%0.2f/%0.2f/%0.2f  ", pitchVel, yawVel, rollVel);
+
+				if (pThing != nullptr)
+				{
+					pThing->pitchVel = pitchVel;
+					pThing->yawVel = yawVel;
+					pThing->rollVel = rollVel;
+				}
 			}
 			else {
 				// if we dont have ang vel, we still seem to have some extra value here.
@@ -409,6 +441,9 @@ void ProcessPacket(DPID senderDpid, READPACKET& p, int dumpIndex)
 				float aimPitch = p.readFloat();
 
 				sprintf(msg + strlen(msg), "  aimPitch:%0.2f ", aimPitch);
+
+				if (pThing != nullptr)
+					pThing->aimPitch = aimPitch;
 			}
 		}
 
@@ -801,8 +836,45 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				//Log("ADDING WARM WELCOME TO CHAT");
 
 
+#if true
+				if (g_nLocalPlayerIndex != -1)
+				{
+					PLAYERSLOT& slot = g_pPlayerSlots[g_nLocalPlayerIndex];
+					JKTHING& thing = g_pThings[slot.thingIndex];
 
+					WRITEPACKET p;
+
+					p.writeUInt16(MSGID_ThingSync);
+					p.writeUInt16(0);// dont think general thing sync updates are tracked
+
+					p.writeInt32(slot.thingIndex);
+					p.writeUInt16(thing.attachFlags);
+					p.writeUInt16(thing.maybeThingSig);
+
+					p.writeFloat(thing.px);
+					p.writeFloat(thing.py);
+					p.writeFloat(thing.pz);
+
+					p.writeFloat(thing.pitch);
+					p.writeFloat(thing.yaw);
+					p.writeFloat(thing.roll);
+
+
+
+					//  uhhh we are supposed to know how much to send based on the thing properties.. but i think players should have velocity and aimpitch
+					p.writeFloat(thing.vx);
+					p.writeFloat(thing.vy);
+					p.writeFloat(thing.vz);
+
+					p.writeFloat(thing.aimPitch);
+
+
+
+					p.send(g_hostDpid);
+				}
+#else
 				WRITEPACKET p;
+
 
 				p.writeUInt16(MSGID_Maybe_ConsoleMessage);
 				p.writeUInt16(0);// dunno-  probably am supposed to fill in a valid packetNum !!!!!
@@ -817,6 +889,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 				p.send(g_hostDpid);
+#endif
 			}
 
 

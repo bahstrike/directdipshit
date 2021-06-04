@@ -39,6 +39,7 @@ public:
 	void writeInt16(short s);
 	void writeInt32(int i);
 	void writeUInt32(unsigned int i);
+	void writeFloat(float f);
 	void writeNullTermString(const char* sz);
 	void writeNullTermWideString(const wchar_t* wcs);
 	void writeFixedString(const char* sz, int max);
