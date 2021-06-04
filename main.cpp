@@ -645,42 +645,50 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 #if true
 	Log("ENUMSESSIONS BEGIN");
-
-	// establish connection via direct IP-  prevents popup of dplay UI asking for IP
+	for (;;)
 	{
-		IDirectPlayLobby2* pLobby = nullptr;
-		hr = CoCreateInstance(CLSID_DirectPlayLobby, NULL, CLSCTX_INPROC_SERVER, IID_IDirectPlayLobby2, (LPVOID*)&pLobby);
-		if (hr != S_OK || pLobby == nullptr)
+		// establish connection via direct IP-  prevents popup of dplay UI asking for IP
 		{
-			hr = hr;
-			return 0;
+			IDirectPlayLobby2* pLobby = nullptr;
+			hr = CoCreateInstance(CLSID_DirectPlayLobby, NULL, CLSCTX_INPROC_SERVER, IID_IDirectPlayLobby2, (LPVOID*)&pLobby);
+			if (hr != S_OK || pLobby == nullptr)
+			{
+				hr = hr;
+				return 0;
+			}
+
+			char* addressConnection = nullptr;
+			DWORD addressConnectionLen = 0;
+			pLobby->CreateAddress(DPSPGUID_TCPIP, DPAID_INet, s_ipAddress, strlen(s_ipAddress) + 1, addressConnection, &addressConnectionLen);//query size
+
+			addressConnection = new char[addressConnectionLen];
+			hr = pLobby->CreateAddress(DPSPGUID_TCPIP, DPAID_INet, s_ipAddress, strlen(s_ipAddress) + 1, addressConnection, &addressConnectionLen);
+			//Log("%s = DirectPlayLobby->CreateAddress", FormatDPLAYRESULT(hr));
+
+
+			pLobby->Release();
+			pLobby = nullptr;
+
+
+			hr = g_pDirectPlay->InitializeConnection(addressConnection, 0);// seems like it can only be done once-  might have to release / recreate directplay object to connect elsewhere
+			//Log("%s = DirectPlay->InitializeConnection", FormatDPLAYRESULT(hr));
+
+			delete[] addressConnection;// assuming that initializeconnection copies internally so we can free
 		}
 
-		char* addressConnection = nullptr;
-		DWORD addressConnectionLen = 0;
-		pLobby->CreateAddress(DPSPGUID_TCPIP, DPAID_INet, s_ipAddress, strlen(s_ipAddress) + 1, addressConnection, &addressConnectionLen);//query size
 
-		addressConnection = new char[addressConnectionLen];
-		hr = pLobby->CreateAddress(DPSPGUID_TCPIP, DPAID_INet, s_ipAddress, strlen(s_ipAddress) + 1, addressConnection, &addressConnectionLen);
-		//Log("%s = DirectPlayLobby->CreateAddress", FormatDPLAYRESULT(hr));
+		DPSESSIONDESC2 sessionDesc;
+		ZeroMemory(&sessionDesc, sizeof(DPSESSIONDESC2));
+		sessionDesc.dwSize = sizeof(DPSESSIONDESC2);
+		sessionDesc.guidApplication = *GimmeJKGUID();
+		hr = g_pDirectPlay->EnumSessions(&sessionDesc, 0, DPlayEnumSessions, NULL, DPENUMSESSIONS_AVAILABLE);
 
+		if(g_szSessionName != nullptr)
+			break;
 
-		pLobby->Release();
-		pLobby = nullptr;
-
-
-		hr = g_pDirectPlay->InitializeConnection(addressConnection, 0);// seems like it can only be done once-  might have to release / recreate directplay object to connect elsewhere
-		//Log("%s = DirectPlay->InitializeConnection", FormatDPLAYRESULT(hr));
-
-		delete[] addressConnection;// assuming that initializeconnection copies internally so we can free
+		Log("no sessions- trying again");
+		Sleep(500);
 	}
-
-
-	DPSESSIONDESC2 sessionDesc;
-	ZeroMemory(&sessionDesc, sizeof(DPSESSIONDESC2));
-	sessionDesc.dwSize = sizeof(DPSESSIONDESC2);
-	sessionDesc.guidApplication = *GimmeJKGUID();
-	hr = g_pDirectPlay->EnumSessions(&sessionDesc, 0, DPlayEnumSessions, NULL, DPENUMSESSIONS_AVAILABLE);
 	Log("ENUMSESSIONS END");
 #endif
 
